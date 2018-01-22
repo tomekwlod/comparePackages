@@ -44,8 +44,8 @@ func main() {
 	newPackageFile := fileNames[1]
 	go untar(ch, newPackageFile, newPackageDirName)
 
-	// channels here are not really needed because we are not passing the variables from the goroutines,
-	// but anyway, we're unpacking the archives in concurrency mode
+	// channels are not really needed here because we are not passing the values from the goroutines,
+	// but anyway, we're unpacking the archives in concurrency mode though
 	_, _ = <-ch, <-ch
 
 	log.Println("Unpacking done")
@@ -55,26 +55,21 @@ func main() {
 	process()
 }
 
-func untar(c chan bool, file1 string, file2 string) {
-	if err := utils.Untar(file1, file2); err != nil {
-		panic(err)
-	}
-
-	// in this case I don't really need to return anything here, so flag is sent instead
-	c <- true
-}
-
 func process() {
 	files := utils.FilesFromDirectory(newPackageDirName, "[\\d]{1,2}.json")
 
 	if len(files) == 0 {
 		log.Println("No valid files found")
+
+		return
 	}
 
 	// create report file
 	f, _ := os.Create("updates.diff")
 	var w *bufio.Writer
 	w = bufio.NewWriter(f)
+	defer w.Flush()
+	defer f.Close()
 
 	for _, file := range files {
 		fmt.Println("")
@@ -107,10 +102,12 @@ func process() {
 			fmt.Fprintln(os.Stderr, "An error occured:", err)
 		}
 
-		// scaning for the differences
+		// walking line-by-line and comparing the new with the old package files
 		s1 := bufio.NewScanner(new)
 		for s1.Scan() {
 			var entry Entry
+
+			// converting a json line to a struct
 			json.Unmarshal([]byte(s1.Text()), &entry)
 
 			id := entry.ID
@@ -153,7 +150,13 @@ func process() {
 
 		fmt.Println("")
 	}
+}
 
-	w.Flush()
-	f.Close()
+func untar(c chan bool, file1 string, file2 string) {
+	if err := utils.Untar(file1, file2); err != nil {
+		panic(err)
+	}
+
+	// in this case I don't really need to return anything here, so flag is sent instead
+	c <- true
 }
