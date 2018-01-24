@@ -7,13 +7,15 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tomekwlod/utils"
 )
 
-type Entry struct {
+type entry struct {
 	ID          int      `json:"id"`
 	Npi         int      `json:"npi"`
 	TTID        int      `json:"ttid"`
@@ -35,15 +37,18 @@ func main() {
 		panic("you must pass exactly 2 arguments, like: `command oldPackage.tar.gz newPackage.tar.gz`")
 	}
 
+	// benchmark start
+	timeStart := time.Now()
+
+	oldPackage := fileNames[0]
+	newPackage := fileNames[1]
+
 	log.Println("Unpacking files")
 
 	// initializing the channel
 	ch := make(chan bool)
 
-	oldPackage := fileNames[0]
 	go untar(ch, oldPackage, oldPackageDirName)
-
-	newPackage := fileNames[1]
 	go untar(ch, newPackage, newPackageDirName)
 
 	// channels are not really needed here because we are not passing the values from the goroutines,
@@ -52,14 +57,19 @@ func main() {
 
 	// processing the files
 	log.Println("Reading the packages and generating the updates report")
-	updates()
+	updates(oldPackage, newPackage)
 
 	// final report
 	log.Println("Generating the final report")
-	report()
+	report(oldPackage, newPackage)
+
+	// benchmark stop
+	duration := time.Since(timeStart).Minutes()
+
+	log.Println("All done in " + strconv.FormatFloat(duration, 'g', 1, 64) + " minutes")
 }
 
-func updates() {
+func updates(oldPackage, newPackage string) {
 	files := utils.FilesFromDirectory(newPackageDirName, "[\\d]{1,2}.json")
 
 	if len(files) == 0 {
@@ -70,14 +80,16 @@ func updates() {
 
 	// create report file
 	f, _ := os.Create("updates.diff")
+	defer f.Close()
 	var w *bufio.Writer
 	w = bufio.NewWriter(f)
 	defer w.Flush()
-	defer f.Close()
+
+	w.WriteString("Update report (" + strings.Replace(filepath.Base(oldPackage), ".tar.gz", "", -1) + " - " + strings.Replace(filepath.Base(newPackage), ".tar.gz", "", -1) + ")\n")
 
 	for _, file := range files {
-		fmt.Println("")
-		log.Println("Working on " + file)
+		// fmt.Println("")
+		// log.Println("Working on " + file)
 
 		// opening an old package
 		old, err := os.Open(oldPackageDirName + "/" + file)
@@ -94,13 +106,13 @@ func updates() {
 		defer new.Close()
 
 		// loading an old package into a memory
-		previousEntries := map[int]Entry{}
+		previousEntries := map[int]entry{}
 		s2 := bufio.NewScanner(old)
 		for s2.Scan() {
-			var entry Entry
-			json.Unmarshal(s2.Bytes(), &entry)
+			var e entry
+			json.Unmarshal(s2.Bytes(), &e)
 
-			previousEntries[entry.ID] = entry
+			previousEntries[e.ID] = e
 		}
 		if err := s2.Err(); err != nil {
 			fmt.Fprintln(os.Stderr, "An error occured:", err)
@@ -109,54 +121,54 @@ func updates() {
 		// walking line-by-line and comparing the new with the old package files
 		s1 := bufio.NewScanner(new)
 		for s1.Scan() {
-			var entry Entry
+			var e entry
 
 			// converting a json line to a struct
-			json.Unmarshal(s1.Bytes(), &entry)
+			json.Unmarshal(s1.Bytes(), &e)
 
-			id := entry.ID
+			id := e.ID
 
 			if pe, ok := previousEntries[id]; !ok {
 				// new entry detected!
-				w.WriteString(strconv.Itoa(id) + "\n")
+				w.WriteString(strconv.Itoa(id) + " \n")
 			} else {
-				// entry found! let's check the differences
+				// match found! let's check the differences
 
-				if pe.FirstName != entry.FirstName {
-					// fmt.Printf("First name changed: %d\n", id)
-					w.WriteString(strconv.Itoa(id) + "\n")
-				}
-				if pe.LastName != entry.LastName {
-					// fmt.Printf("Last name changed: %d\n", id)
-					w.WriteString(strconv.Itoa(id) + "\n")
-				}
-				if pe.MiddleName != entry.MiddleName {
-					// fmt.Printf("Middle name changed: %d\n", id)
-					w.WriteString(strconv.Itoa(id) + "\n")
-				}
-				if pe.LocationID != entry.LocationID {
-					// fmt.Printf("Location changed: %d\n", id)
-					w.WriteString(strconv.Itoa(id) + "\n")
-				}
-				if pe.Npi != entry.Npi {
+				delete(previousEntries, id)
+
+				if pe.Npi != e.Npi {
 					// fmt.Printf("NPI changed: %d\n", id)
-					w.WriteString(strconv.Itoa(id) + "\n")
-				}
-				if pe.TTID != entry.TTID {
+					w.WriteString(strconv.Itoa(id) + " \n")
+				} else if pe.TTID != e.TTID {
 					// fmt.Printf("TTID changed: %d (%d != %d)\n", id, oldKOL.TTID, kol.TTID)
-					w.WriteString(strconv.Itoa(id) + "\n")
+					w.WriteString(strconv.Itoa(id) + " \n")
+				} else if pe.FirstName != e.FirstName {
+					// fmt.Printf("First name changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+				} else if pe.LastName != e.LastName {
+					// fmt.Printf("Last name changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+				} else if pe.MiddleName != e.MiddleName {
+					// fmt.Printf("Middle name changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+				} else if pe.LocationID != e.LocationID {
+					// fmt.Printf("Location changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
 				}
 			}
+
 		}
 		if err := s1.Err(); err != nil {
-			fmt.Fprintln(os.Stderr, "An error occured:", err)
+			panic(err)
 		}
 
-		fmt.Println("")
+		for de := range previousEntries {
+			w.WriteString(strconv.Itoa(de) + " \n")
+		}
 	}
 }
 
-func report() {
+func report(oldPackage, newPackage string) {
 	var report = make(map[string]map[string]map[string][]interface{})
 
 	newFiles := utils.FilesFromDirectory(newPackageDirName, "")
@@ -171,10 +183,9 @@ func report() {
 
 		return
 	}
-	fmt.Println(oldPackageDirName, oldFiles)
+
 	// Files level diff
 	removedFiles, addedFiles := utils.SlicesDiff(oldFiles, newFiles)
-	// fmt.Printf("\n\nRemoved files: %+v\n\nAdded files: %+v", removedFiles, addedFiles)
 
 	// Types/Fields diff
 	dictNewFiles := utils.FilesFromDirectory(newPackageDirName, "dict[A-z]+\\.json")
@@ -236,40 +247,51 @@ func report() {
 					// if no match = removed fields
 					if !found {
 						rm := map[string]interface{}{ok: om}
-						// removedFields[of] = append(removedFields[of], rm)
 
-						report[reportName]["fields removed"][of] = append(report[reportName]["fields removed"][of], rm)
+						report[reportName]["fields removed"][ok] = append(report[reportName]["fields removed"][ok], rm)
 					}
 				}
 
 				// all left are actually been added since
 				for njk, njv := range newJSON {
 					rm := map[string]interface{}{njk: njv}
-					// addedFields[of] = append(addedFields[of], rm)
 
-					report[reportName]["fields added"][of] = append(report[reportName]["fields added"][of], rm)
+					report[reportName]["fields added"][njk] = append(report[reportName]["fields added"][njk], rm)
 				}
 			}
 		}
 	}
 
+	// create report file
+	f, _ := os.Create("report.diff")
+	defer f.Close()
+	var w *bufio.Writer
+	w = bufio.NewWriter(f)
+	defer w.Flush()
+
+	w.WriteString("Final package report (" + strings.Replace(filepath.Base(oldPackage), ".tar.gz", "", -1) + " - " + strings.Replace(filepath.Base(newPackage), ".tar.gz", "", -1) + ")\n")
+
 	for reportDict, dictValue := range report {
-		fmt.Printf("\n\n-> %+v", reportDict)
+		// fmt.Printf("\n\n-> %+v", reportDict)
+		w.WriteString("\n-> " + reportDict + "\n")
 
 		for diffType, value := range dictValue {
 			changes := len(value)
 
-			fmt.Printf("\n%d %+v", changes, diffType)
+			// fmt.Printf("\n%d %+v", changes, diffType)
+			w.WriteString(strconv.Itoa(changes) + " " + diffType + "\n")
 
 			for i, v := range value {
 				switch diffType {
 				case "changes detected":
 					mv := v[0].(map[string]string)
 
-					fmt.Printf("\n- %+v (from: `%v` to: `%v`)", i, mv["from"], mv["to"])
+					// fmt.Printf("\n- %+v (from: `%v` to: `%v`)", i, mv["from"], mv["to"])
+					w.WriteString("- " + i + " (from: `" + mv["from"] + "` to: `" + mv["to"] + "`)" + "\n")
 					break
 				default:
-					fmt.Printf("\n- %+v", i)
+					// fmt.Printf("\n- %+v", i)
+					w.WriteString("- " + i + "\n")
 					break
 				}
 
@@ -278,38 +300,31 @@ func report() {
 	}
 
 	if len(removedFiles) > 0 {
-		fmt.Printf("\n\n-> %+v", "Removed files")
+		// fmt.Printf("\n\n-> %+v", "Removed files")
+		w.WriteString("\n-> Removed files\n")
 
 		for _, file := range removedFiles {
-			fmt.Printf("\n- %+v", file)
+			// fmt.Printf("\n- %+v", file)
+			w.WriteString("- " + file + "\n")
 		}
 	}
 	if len(addedFiles) > 0 {
-		fmt.Printf("\n\n-> %+v", "Added files")
+		// fmt.Printf("\n\n-> %+v", "Added files")
+		w.WriteString("\n-> Added files\n")
 
 		for _, file := range addedFiles {
-			fmt.Printf("\n- %+v", file)
+			// fmt.Printf("\n- %+v", file)
+			w.WriteString("- " + file + "\n")
 		}
 	}
 
-	c := utils.AskForConfirmation("Do you want to generate the report?")
-	if !c {
-		fmt.Println("\n\nFinished without generating the report.")
-		return
-	}
-
-	//generate the report here
-
-	// create report file
-	f, _ := os.Create("report.diff")
-	var w *bufio.Writer
-	w = bufio.NewWriter(f)
-	w.WriteString("Final package report\n")
-	defer w.Flush()
-	defer f.Close()
-
-	fmt.Println()
-	log.Println("Report generated")
+	// // Confirmation
+	// c := utils.AskForConfirmation("Do you want to generate the report?")
+	// if !c {
+	// 	fmt.Println("\n\nFinished without generating the report.")
+	// 	return
+	// }
+	return
 }
 
 // func test() {
