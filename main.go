@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -65,8 +66,17 @@ func main() {
 
 	// benchmark stop
 	duration := time.Since(timeStart).Minutes()
-
 	log.Println("All done in " + strconv.FormatFloat(duration, 'g', 1, 64) + " minutes")
+
+	// removing the archive
+	// Confirmation
+	yes := utils.AskForConfirmation("Do you want to remove the temporary files?")
+	if yes {
+		log.Println("Files removed")
+
+		os.RemoveAll(oldPackageDirName)
+		os.RemoveAll(newPackageDirName)
+	}
 }
 
 func updates(oldPackage, newPackage string) {
@@ -79,18 +89,23 @@ func updates(oldPackage, newPackage string) {
 	}
 
 	// create report file
-	f, _ := os.Create("updates.diff")
+	f, _ := os.Create("updates_" + strings.Replace(filepath.Base(newPackage), ".tar.gz", "", -1) + ".diff")
 	defer f.Close()
 	var w *bufio.Writer
 	w = bufio.NewWriter(f)
 	defer w.Flush()
 
+	// create report file
+	fi, _ := os.Create("updates_ext_" + strings.Replace(filepath.Base(newPackage), ".tar.gz", "", -1) + ".diff")
+	defer fi.Close()
+	var wi *bufio.Writer
+	wi = bufio.NewWriter(fi)
+	defer wi.Flush()
+
 	w.WriteString("Update report (" + strings.Replace(filepath.Base(oldPackage), ".tar.gz", "", -1) + " - " + strings.Replace(filepath.Base(newPackage), ".tar.gz", "", -1) + ")\n")
+	wi.WriteString("Update report (" + strings.Replace(filepath.Base(oldPackage), ".tar.gz", "", -1) + " - " + strings.Replace(filepath.Base(newPackage), ".tar.gz", "", -1) + ")\n")
 
 	for _, file := range files {
-		// fmt.Println("")
-		// log.Println("Working on " + file)
-
 		// opening an old package
 		old, err := os.Open(oldPackageDirName + "/" + file)
 		if err != nil {
@@ -131,6 +146,7 @@ func updates(oldPackage, newPackage string) {
 			if pe, ok := previousEntries[id]; !ok {
 				// new entry detected!
 				w.WriteString(strconv.Itoa(id) + " \n")
+				wi.WriteString(strconv.Itoa(id) + " - NEW \n")
 			} else {
 				// match found! let's check the differences
 
@@ -139,21 +155,34 @@ func updates(oldPackage, newPackage string) {
 				if pe.Npi != e.Npi {
 					// fmt.Printf("NPI changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - NPI \n")
 				} else if pe.TTID != e.TTID {
 					// fmt.Printf("TTID changed: %d (%d != %d)\n", id, oldKOL.TTID, kol.TTID)
 					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - TTID \n")
 				} else if pe.FirstName != e.FirstName {
 					// fmt.Printf("First name changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - FN \n")
 				} else if pe.LastName != e.LastName {
 					// fmt.Printf("Last name changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LN \n")
 				} else if pe.MiddleName != e.MiddleName {
 					// fmt.Printf("Middle name changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - MN \n")
 				} else if pe.LocationID != e.LocationID {
 					// fmt.Printf("Location changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LID \n")
+				} else {
+					// below will be reported if there are different specialities or even the same but in different order
+					if !reflect.DeepEqual(pe.Specialties, e.Specialties) {
+						// fmt.Printf("Location changed: %d\n", id)
+						w.WriteString(strconv.Itoa(id) + " \n")
+						wi.WriteString(strconv.Itoa(id) + " - SPL \n")
+					}
 				}
 			}
 
@@ -164,6 +193,7 @@ func updates(oldPackage, newPackage string) {
 
 		for de := range previousEntries {
 			w.WriteString(strconv.Itoa(de) + " \n")
+			wi.WriteString(strconv.Itoa(de) + " - DEL \n")
 		}
 	}
 }
