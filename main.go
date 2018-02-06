@@ -20,12 +20,15 @@ type entry struct {
 	ID          int      `json:"id"`
 	Npi         int      `json:"npi"`
 	TTID        int      `json:"ttid"`
-	FirstName   int      `json:"first_name"`
-	MiddleName  int      `json:"middle_name"`
-	LastName    int      `json:"last_name"`
+	FirstName   string   `json:"first_name"`
+	MiddleName  string   `json:"middle_name"`
+	LastName    string   `json:"last_name"`
 	Specialties []string `json:"specialties"`
-	LocationID  int      `json:"location.location"`
+	Location    Location `json:"location"`
 	Position    int      `json:"ranking.position"`
+}
+type Location struct {
+	ID int `json:"location"`
 }
 
 const oldPackageDirName = "oldPackage"
@@ -155,27 +158,27 @@ func updates(oldPackage, newPackage string) {
 				if pe.Npi != e.Npi {
 					// fmt.Printf("NPI changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
-					wi.WriteString(strconv.Itoa(id) + " - NPI \n")
+					wi.WriteString(strconv.Itoa(id) + " - NPI " + strconv.Itoa(pe.Npi) + "!=" + strconv.Itoa(e.Npi) + "\n")
 				} else if pe.TTID != e.TTID {
 					// fmt.Printf("TTID changed: %d (%d != %d)\n", id, oldKOL.TTID, kol.TTID)
 					w.WriteString(strconv.Itoa(id) + " \n")
-					wi.WriteString(strconv.Itoa(id) + " - TTID \n")
+					wi.WriteString(strconv.Itoa(id) + " - TTID " + strconv.Itoa(pe.TTID) + "!=" + strconv.Itoa(e.TTID) + "\n")
 				} else if pe.FirstName != e.FirstName {
 					// fmt.Printf("First name changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
-					wi.WriteString(strconv.Itoa(id) + " - FN \n")
+					wi.WriteString(strconv.Itoa(id) + " - FN " + pe.FirstName + "!=" + e.FirstName + "\n")
 				} else if pe.LastName != e.LastName {
 					// fmt.Printf("Last name changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
-					wi.WriteString(strconv.Itoa(id) + " - LN \n")
+					wi.WriteString(strconv.Itoa(id) + " - LN " + pe.LastName + "!=" + e.LastName + "\n")
 				} else if pe.MiddleName != e.MiddleName {
 					// fmt.Printf("Middle name changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
-					wi.WriteString(strconv.Itoa(id) + " - MN \n")
-				} else if pe.LocationID != e.LocationID {
+					wi.WriteString(strconv.Itoa(id) + " - MN " + pe.MiddleName + "!=" + e.MiddleName + "\n")
+				} else if pe.Location.ID != e.Location.ID {
 					// fmt.Printf("Location changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
-					wi.WriteString(strconv.Itoa(id) + " - LID \n")
+					wi.WriteString(strconv.Itoa(id) + " - LID " + strconv.Itoa(pe.Location.ID) + "!=" + strconv.Itoa(e.Location.ID) + "\n")
 				} else {
 					// below will be reported if there are different specialities or even the same but in different order
 					if !reflect.DeepEqual(pe.Specialties, e.Specialties) {
