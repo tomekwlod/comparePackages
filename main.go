@@ -28,7 +28,15 @@ type entry struct {
 	Position    int      `json:"ranking.position"`
 }
 type Location struct {
-	ID int `json:"location"`
+	ID          int    `json:"location"`
+	Affiliation string `json:"affiliation"`
+	City        string `json:"city"`
+	Address     string `json:"address"`
+	Zip         string `json:"zip"`
+	State       string `json:"state"`
+	Country     string `json:"country"`
+	Latitude    string `json:"latitude"`
+	Longitude   string `json:"longitude"`
 }
 
 const oldPackageDirName = "oldPackage"
@@ -176,9 +184,41 @@ func updates(oldPackage, newPackage string) {
 					w.WriteString(strconv.Itoa(id) + " \n")
 					wi.WriteString(strconv.Itoa(id) + " - MN " + pe.MiddleName + "!=" + e.MiddleName + "\n")
 				} else if pe.Location.ID != e.Location.ID {
-					// fmt.Printf("Location changed: %d\n", id)
+					// fmt.Printf("Location ID changed: %d\n", id)
 					w.WriteString(strconv.Itoa(id) + " \n")
 					wi.WriteString(strconv.Itoa(id) + " - LID " + strconv.Itoa(pe.Location.ID) + "!=" + strconv.Itoa(e.Location.ID) + "\n")
+				} else if pe.Location.Affiliation != e.Location.Affiliation {
+					// fmt.Printf("Location Affiliation changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LAF " + pe.Location.Affiliation + "!=" + e.Location.Affiliation + "\n")
+				} else if pe.Location.City != e.Location.City {
+					// fmt.Printf("Location City changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LCI " + pe.Location.City + "!=" + e.Location.City + "\n")
+				} else if pe.Location.Zip != e.Location.Zip {
+					// fmt.Printf("Location ZIP changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LZ " + pe.Location.Zip + "!=" + e.Location.Zip + "\n")
+				} else if pe.Location.Latitude != e.Location.Latitude {
+					// fmt.Printf("Location LATITUDE changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LLA " + pe.Location.Latitude + "!=" + e.Location.Latitude + "\n")
+				} else if pe.Location.Longitude != e.Location.Longitude {
+					// fmt.Printf("Location LONGITUDE changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LLO " + pe.Location.Longitude + "!=" + e.Location.Longitude + "\n")
+				} else if pe.Location.State != e.Location.State {
+					// fmt.Printf("Location State changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LST " + pe.Location.State + "!=" + e.Location.State + "\n")
+				} else if pe.Location.Address != e.Location.Address {
+					// fmt.Printf("Location Address changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LAD " + pe.Location.Address + "!=" + e.Location.Address + "\n")
+				} else if pe.Location.Country != e.Location.Country {
+					// fmt.Printf("Location Country changed: %d\n", id)
+					w.WriteString(strconv.Itoa(id) + " \n")
+					wi.WriteString(strconv.Itoa(id) + " - LCO " + pe.Location.Country + "!=" + e.Location.Country + "\n")
 				} else {
 					// below will be reported if there are different specialities or even the same but in different order
 					if !reflect.DeepEqual(pe.Specialties, e.Specialties) {
