@@ -20,9 +20,9 @@ type entry struct {
 	ID          int      `json:"id"`
 	Npi         int      `json:"npi"`
 	TTID        int      `json:"ttid"`
-	FirstName   string   `json:"first_name"`
-	MiddleName  string   `json:"middle_name"`
-	LastName    string   `json:"last_name"`
+	FirstName   string   `json:"firstName"`
+	MiddleName  string   `json:"middleName"`
+	LastName    string   `json:"lastName"`
 	Specialties []string `json:"specialties"`
 	Location    Location `json:"location"`
 	Position    int      `json:"ranking.position"`
